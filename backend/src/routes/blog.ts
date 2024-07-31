@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { PrismaClient } from "@prisma/client/edge";
 import { withAccelerate } from "@prisma/extension-accelerate";
-import { decode, sign, verify } from "hono/jwt";
+import { sign, verify } from "hono/jwt";
+import { createBlogInput, updateBlogInput } from "@paulthedev/blogger-common";
 
 export const blogRouter = new Hono<{
   Bindings: {
@@ -16,8 +17,7 @@ export const blogRouter = new Hono<{
 // To restrict a middleware to certain routes, we use "/blog/*"
 blogRouter.use("/*", async function (c, next) {
   // issue is in // authHeader: string | undefined
-  // instead of //  const authHeader = c.req.header("authorization");
-  // so we do this
+  //so instead of // const authHeader = c.req.header("authorization");
   const authHeader = c.req.header("authorization") || "";
   try {
     // if the header contains token like this // bearer 8JHSDUW9IU8RHLSKHFSDHF23
@@ -29,21 +29,27 @@ blogRouter.use("/*", async function (c, next) {
     }
     c.set("userId", payload.id as string);
     await next();
-    // wrong //return next();
-    // no need to return as this func dont need to return anything
+    // wrong //return next();  // no need to return as this func dont need to return anything
   } catch (error) {
     c.status(401);
-    return c.json({ error: "unauthorized" });     
+    return c.json({ error: "unauthorized" });
   }
 });
 
 blogRouter.post("/", async (c) => {
-  const body = await c.req.json();
-  const authorId = c.get("userId");
-
   const prisma = new PrismaClient({
     datasourceUrl: c.env.POOLING_URL,
   }).$extends(withAccelerate());
+
+  const body = await c.req.json();
+
+  const { success } = createBlogInput.safeParse(body);
+  if (!success) {
+    c.status(400);
+    return c.json({ error: "invalid input" });
+  }
+
+  const authorId = c.get("userId");
 
   const blog = await prisma.blog.create({
     data: {
@@ -62,6 +68,12 @@ blogRouter.put("/", async (c) => {
   const prisma = new PrismaClient({
     datasourceUrl: c.env.POOLING_URL,
   }).$extends(withAccelerate());
+
+  const { success } = updateBlogInput.safeParse(body);
+  if (!success) {
+    c.status(400);
+    return c.json({ error: "invalid input" });
+  }
 
   const blog = await prisma.blog.update({
     where: {
@@ -101,7 +113,7 @@ blogRouter.get("/id/:id", async (c) => {
 });
 
 //todo: add pagination
-//todo: show user specific posts
+//todo: shows user specific posts
 blogRouter.get("/bulk", async (c) => {
   const prisma = new PrismaClient({
     datasourceUrl: c.env.POOLING_URL,

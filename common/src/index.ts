@@ -14,7 +14,8 @@ export const signinInput = z.object({
 export const createBlogInput = z.object({
   title: z.string(),
   content: z.string(),
-  authorId: z.string()
+  // authorId: z.string() // u cant do that, if so then u you will have to provide with this input  
+  //if not it giveees this input error
 });
 
 export const updateBlogInput = z.object({
